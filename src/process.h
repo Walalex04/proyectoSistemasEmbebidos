@@ -6,8 +6,8 @@
 #include "sensores.h"
 
 
-
-
+#include "xtensa/core-macros.h"
+#include <driver/timer.h>
 
 //Configure handls
 TaskHandle_t handleShowMessage = NULL;
@@ -72,7 +72,7 @@ void TaskServer(void *pvParameters){
     xTaskCreatePinnedToCore(
         TaskPlayAudio,
         "TaskPlayAudio",
-        4096,
+        8192,
         NULL,
         1,
         NULL,
@@ -296,6 +296,60 @@ void TaskCheckTareas(void *pvParameters){
     }
     
 }
+
+
+void preciseDelayCycles(uint32_t cycles) {
+  uint32_t start = XTHAL_GET_CCOUNT();
+  while ((XTHAL_GET_CCOUNT() - start) < cycles);
+}
+
+
+// ===== VARIABLES GLOBALES =====
+hw_timer_t *timer = NULL;
+File audioFile;
+
+uint8_t buffer[BUFFER_SIZE];
+volatile int audioIndex = 0;
+volatile int bufferLen = 0;
+volatile bool bufferPlaying = false;
+volatile bool audioDone = false;
+
+// ===== INTERRUPCIÓN DEL TIMER =====
+void IRAM_ATTR onTimer() {
+  if (audioIndex < bufferLen) {
+    dacWrite(DAC_PIN, buffer[audioIndex++]);
+  } else {
+    timerAlarmDisable(timer);  // Detiene la interrupción
+    timerStop(timer);
+    bufferPlaying = false;     // Marca que se terminó el bloque
+  }
+  timerWrite(timer, 0); // Reinicia el contador
+}
+
+// ===== INICIALIZACIÓN DEL TIMER =====
+void setupTimer() {
+  timer = timerBegin(TIMER_NUMBER, TIMER_DIVIDER, true);
+  timerAttachInterrupt(timer, &onTimer, true);
+  timerAlarmWrite(timer, TIMER_TICKS - 22, true);
+  timerAlarmDisable(timer);
+}
+
+// ===== INICIAR LA REPRODUCCIÓN DEL BLOQUE ACTUAL =====
+void startPlayback() {
+  audioIndex = 0;
+  bufferPlaying = true;
+  timerStart(timer);
+  timerAlarmEnable(timer);
+}
+
+// ===== DETENER LA REPRODUCCIÓN =====
+void stopPlayback() {
+  timerAlarmDisable(timer);
+  timerStop(timer);
+  bufferPlaying = false;
+
+}
+
 void TaskPlayAudio(void *pvPaRarameters){
     Serial.println("Se ejecuta desde play Audio");
     while(1){
@@ -310,23 +364,61 @@ void TaskPlayAudio(void *pvPaRarameters){
              Serial.println("Reproduciendo audio...");
 
             // Duración entre muestras, en microsegundos
-            const int sampleRate = 8000;  // frecuencia en Hz
+            const int sampleRate = 22050;  // frecuencia en Hz
             int sampleDelay = 1000000 / sampleRate;
             size_t bytesRead = 0;
             size_t filesize = audioFile.size();  // Tamaño en bytes
             Serial.print("Tamaño del archivo: ");
             Serial.print(filesize);
             Serial.println(" bytes");
+            
+            //const int bufferSize = 5120;
+            //uint8_t buffer[bufferSize];
+            
+            /*
+            unsigned long t0 = micros();
             while (audioFile.available()) {
+                /*
                 uint8_t sample = audioFile.read();
+                uint8_t sample2 = sample*65535/255;
                 dacWrite(DACPIN, sample);
-                ets_delay_us(sampleDelay - 100); //change 80 
-                if(playAudio == 0) break;
+                delayMicroseconds(50); //change 80 
+                if(playAudio == 0) break;   
+                
+
+                int len = audioFile.read(buffer, bufferSize);
+                for (int i = 0; i < len; i++) {
+                    dacWrite(25, buffer[i]);  // GPIO25
+                    //dac_output_voltage(DAC_CHANNEL_1, buffer[i]);
+                    //delayMicroseconds(8);
+                    preciseDelayCycles(250);
+                }
 
             }
+*/
+             while (audioFile.available()) {
+                bufferLen = audioFile.read(buffer, BUFFER_SIZE);
+
+                if (bufferLen <= 0) {
+                audioDone = true;
+                break;
+                }
+
+                startPlayback();
+
+                // Espera hasta que se termine de reproducir el bloque
+                while (bufferPlaying) {
+                delay(1);
+                }
+            }
+
+            stopPlayback();
             audioFile.close();
-            Serial.println("Reproducción terminada.");  
+            Serial.println("Reproducción finalizada");
+            audioDone = true;
         }
+                    
+        
         
     }
 }                                                                                                           

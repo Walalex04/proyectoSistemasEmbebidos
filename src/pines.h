@@ -97,4 +97,20 @@ static volatile bool playAudio = 0;
 static char lastRED = 0;
 static char lastGreen = 0;
 static char lastBlue = 0;
+
+
+
+// ===== CONFIGURACIÓN GENERAL =====
+#define DAC_PIN             25              // DAC1 = GPIO25
+#define SAMPLE_RATE         22050           // Frecuencia de muestreo del audio
+#define BUFFER_SIZE         5120            // Tamaño del bloque de lectura
+
+// ===== CONFIGURACIÓN DEL TIMER =====
+#define TIMER_GROUP         0               // Grupo 0
+#define TIMER_NUMBER        0               // Timer 0 del grupo 0
+#define TIMER_DIVIDER       80              // 80 MHz / 80 = 1 MHz (1 tick = 1 µs)
+#define TIMER_BASE_CLK      80000000ULL     // Frecuencia base del ESP32
+#define TIMER_FREQ          (TIMER_BASE_CLK / TIMER_DIVIDER)
+#define TIMER_TICKS         (TIMER_FREQ / SAMPLE_RATE)  // ≈ 45 ticks para 22050 Hz 
+
 #endif

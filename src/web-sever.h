@@ -622,7 +622,7 @@ void intentoconexion(const char *apname, const char *appassword)
             {
             Serial.println("audio cargado");
 
-        }else{
+        }else{  
                 Serial.println("Ocurrio un problema al cargar el audio");
             
         }

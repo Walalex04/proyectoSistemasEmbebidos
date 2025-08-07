@@ -4,8 +4,6 @@
 
 
 
-
-
 void setup() {
   Serial.begin(115200);
   initMatriz();
@@ -22,7 +20,11 @@ void setup() {
   ledcAttachPin(PINROJO, CHANNEL1);
   ledcAttachPin(PINAZUL, CHANNEL2);
   ledcAttachPin(PINVERDE, CHANEEL3);
+  //dac_output_enable(DAC_CHANNEL_1);
+  setupTimer();
 
+  
+  //setupI2SDAC();
   xTaskCreatePinnedToCore(
             TashShowled,
             "TashShowled",
